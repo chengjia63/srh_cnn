@@ -70,7 +70,7 @@ def focal_loss(y_true, y_pred):
 
 def generator_prediction(model, generator):
     # foward pass on dataset
-    cnn_predictions = model.predict_generator(generator, steps=val_steps, verbose=1)
+    cnn_predictions = model.predict(generator, steps=val_steps, verbose=1)
     cnn_predict_1d = np.argmax(cnn_predictions, axis = 1)
     index_validation = validation_generator.classes
     # Overall accuracy
@@ -94,7 +94,8 @@ if __name__ == '__main__':
         vertical_flip=True,
         preprocessing_function = cnn_preprocessing,
         data_format = "channels_last"
-    ).flow_from_directory(directory = training_dir,
+    ).flow_from_directory(
+        directory = training_dir,
         target_size = (img_rows, img_cols), 
         color_mode = 'rgb', 
         classes = None, 
@@ -122,7 +123,13 @@ if __name__ == '__main__':
     parallel_model = srh_model(backbone=DenseNet121, gpu_num=1)
 
     # compile model with Adam optimizer
-    ADAM = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+    ADAM = Adam(
+        lr=0.0001,
+        beta_1=0.9,
+        beta_2=0.999,
+        epsilon=1e-08,
+        decay=0.0)
+
     parallel_model.compile(
         optimizer=ADAM,
         loss="categorical_crossentropy",
@@ -134,6 +141,7 @@ if __name__ == '__main__':
         min_delta = 0.05,
         patience=10,
         mode = 'auto')
+
     checkpoint = ModelCheckpoint(
         'Final_weights.{epoch:02d}-{val_accuracy:.2f}.hdf5',
         monitor='val_accuracy',
@@ -141,7 +149,8 @@ if __name__ == '__main__':
         save_best_only=True,
         save_weights_only=True,
         mode='auto',
-        period=1)
+        save_freq='epoch')
+
     reduce_LR = ReduceLROnPlateau(
         monitor='accuracy',
         factor=0.5,
@@ -150,6 +159,7 @@ if __name__ == '__main__':
         mode='auto',
         cooldown=0,
         min_lr=0)
+
     logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = TensorBoard(log_dir=logdir)
 
