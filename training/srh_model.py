@@ -4,19 +4,20 @@
 Script to build our SRH model
 '''
 # Model Layers
-from keras.models import Sequential, Model, Input
-from keras.layers import Input, Dense, Dropout, BatchNormalization, Activation
-from keras.layers import Conv2D, GlobalMaxPool2D, GlobalAveragePooling2D
-from keras.utils import multi_gpu_model
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.layers import Input, Dense, Dropout, BatchNormalization, Activation
+from tensorflow.keras.layers import Conv2D, GlobalMaxPool2D, GlobalAveragePooling2D
+from tensorflow.keras.utils import multi_gpu_model
 
 # Open-source models
-from keras.applications.inception_v3 import InceptionV3
-from keras.applications.inception_resnet_v2 import InceptionResNetV2
-from keras.applications.densenet import DenseNet121
+from tensorflow.keras.applications.inception_v3 import InceptionV3
+from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
+from tensorflow.keras.applications.densenet import DenseNet121
 
-TOTAL_CLASSES = 14
+TOTAL_CLASSES = 2
 
-def srh_model(backbone, input_shape = (300, 300, 3), weights = False, dropout = 0.5, gpu_num = 1):
+def srh_model(backbone, input_shape = (300, 300, 3), weights = False,
+	dropout = 0.5, gpu_num = 1):
 	"""
 	SRH CNN model import
 	"""
@@ -40,7 +41,6 @@ def srh_model(backbone, input_shape = (300, 300, 3), weights = False, dropout = 
 	if gpu_num > 1: 
 		parallel_model = multi_gpu_model(model, gpus=gpu_num)
 		return parallel_model
-
 	else:
 		return model
 
