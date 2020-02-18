@@ -70,9 +70,9 @@ def cnn_preprocessing(image):
     """
     Channel-wise means calculated over NIO dataset
     """
-    image[:,:,0] -= 102.1
-    image[:,:,1] -= 91.0
-    image[:,:,2] -= 101.5
+    image[:,:,0] -= 174.4700
+    image[:,:,1] -= 134.0318
+    image[:,:,2] -= 175.5624
     return image
 
 def random_crop(image, crop_size = IMAGE_SIZE):

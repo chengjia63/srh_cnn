@@ -14,7 +14,7 @@ from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.applications.densenet import DenseNet121
 
-TOTAL_CLASSES = 2
+TOTAL_CLASSES = 3
 
 def srh_model(backbone, input_shape = (300, 300, 3), weights = False,
 	dropout = 0.5, gpu_num = 1):

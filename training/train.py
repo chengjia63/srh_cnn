@@ -26,6 +26,8 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 # Sklearn modules
 from sklearn.utils import class_weight
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
 
 from training.srh_model import srh_model
 from preprocessing.preprocess import cnn_preprocessing
@@ -35,8 +37,8 @@ img_rows = 300
 img_cols = 300
 img_channels = 3
 
-total_classes = 2
-class_names = ['carcinoma', 'lymphoma']
+class_names = ['carcinoma', 'lymphoma', 'glioma']
+total_classes = len(class_names)
 
 def find_pair_factors_for_CNN(x):
     """
@@ -75,10 +77,29 @@ def generator_prediction(model, generator):
     index_validation = validation_generator.classes
     # Overall accuracy
     print(accuracy_score(index_validation, cnn_predict_1d))
+    print(confusion_matrix(index_validation, cnn_predict_1d))
+    print(classification_report(index_validation, cnn_predict_1d))
 
 def save_model(model, name):
     model.save(name + ".hdf5")
 
+def metric_a(y_true, y_pred):
+    classes = tf.argmax(y_true, axis=0)
+    class_true = tf.boolean_mask(y_true,tf.equal(classes, 0))
+    class_pred = tf.boolean_mask(y_pred,tf.equal(classes, 0))
+    return tf.keras.metrics.categorical_accuracy(class_true, class_pred)
+
+def metric_b(y_true, y_pred):
+    classes = tf.argmax(y_true, axis=0)
+    class_true = tf.boolean_mask(y_true,tf.equal(classes, 1))
+    class_pred = tf.boolean_mask(y_pred,tf.equal(classes, 1))
+    return tf.keras.metrics.categorical_accuracy(class_true, class_pred)
+
+def metric_c(y_true, y_pred):
+    classes = tf.argmax(y_true, axis=0)
+    class_true = tf.boolean_mask(y_true,tf.equal(classes, 2))
+    class_pred = tf.boolean_mask(y_pred,tf.equal(classes, 2))
+    return tf.keras.metrics.categorical_accuracy(class_true, class_pred)
 
 if __name__ == '__main__':
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -90,15 +111,15 @@ if __name__ == '__main__':
 
     # instantiate train generator
     train_generator = ImageDataGenerator(
-        horizontal_flip=True,
-        vertical_flip=True,
+        horizontal_flip=False,
+        vertical_flip=False,
         preprocessing_function = cnn_preprocessing,
         data_format = "channels_last"
     ).flow_from_directory(
         directory = training_dir,
         target_size = (img_rows, img_cols), 
         color_mode = 'rgb', 
-        classes = None, 
+        classes = class_names, 
         class_mode = 'categorical',
         batch_size = 8, 
         shuffle = True)
@@ -114,17 +135,32 @@ if __name__ == '__main__':
         directory = validation_dir,
         target_size = (img_rows, img_cols), 
         color_mode = 'rgb',
-        classes = None, 
+        classes = class_names, 
+        class_mode = 'categorical',
+        batch_size = val_batch, 
+        shuffle = True)
+
+    # find the best combination of steps and batch size for the validation generator
+    test_generator = ImageDataGenerator(
+        horizontal_flip=False,
+        vertical_flip=False,
+        preprocessing_function = cnn_preprocessing,
+        data_format = "channels_last"
+    ).flow_from_directory(
+        directory = validation_dir,
+        target_size = (img_rows, img_cols), 
+        color_mode = 'rgb',
+        classes = class_names, 
         class_mode = 'categorical',
         batch_size = val_batch, 
         shuffle = False)
 
     # instantiate model
-    parallel_model = srh_model(backbone=DenseNet121, gpu_num=1)
+    parallel_model = srh_model(backbone=DenseNet121, gpu_num=1, weights=False)
 
     # compile model with Adam optimizer
     ADAM = Adam(
-        lr=0.0001,
+        lr=1e-6,
         beta_1=0.9,
         beta_2=0.999,
         epsilon=1e-08,
@@ -133,7 +169,7 @@ if __name__ == '__main__':
     parallel_model.compile(
         optimizer=ADAM,
         loss="categorical_crossentropy",
-        metrics =['accuracy']) 
+        metrics =['accuracy', metric_a, metric_b, metric_c]) 
 
     # specify callbacks for training
     early_stop = EarlyStopping(
@@ -152,7 +188,7 @@ if __name__ == '__main__':
         save_freq='epoch')
 
     reduce_LR = ReduceLROnPlateau(
-        monitor='accuracy',
+        monitor='val_accuracy',
         factor=0.5,
         patience=10,
         verbose=1,
@@ -163,7 +199,7 @@ if __name__ == '__main__':
     logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = TensorBoard(log_dir=logdir)
 
-    callbacks_list = [checkpoint, early_stop, reduce_LR, tensorboard_callback]
+    callbacks_list = [tensorboard_callback, checkpoint, reduce_LR, tensorboard_callback]
 
     # class weights to correct for class imbalance
     class_weight = class_weight.compute_class_weight('balanced', 
@@ -173,7 +209,7 @@ if __name__ == '__main__':
     # fit generator for model training
     parallel_model.fit(
         train_generator,
-        steps_per_epoch=1000, #10000,
+        steps_per_epoch=500, #10000,
         epochs=200,
         shuffle=True,
         class_weight=weight_dict,
@@ -186,6 +222,6 @@ if __name__ == '__main__':
         callbacks=callbacks_list
     )
 
-    # validation set prediction and save model
-    generator_prediction(parallel_model, validation_generator)
     save_model(parallel_model, "model")
+    # validation set prediction and save model
+    generator_prediction(parallel_model, test_generator)
